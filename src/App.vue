@@ -17,7 +17,16 @@ export default {
   components: {},
   data() {
     return {
-      accelerometer: 'i'
+      accelerometer: 'i',
+      Engine: Matter.Engine,
+      Render: Matter.Render,
+      Runner: Matter.Runner,
+      Composites: Matter.Composites,
+      Common: Matter.Common,
+      MouseConstraint: Matter.MouseConstraint,
+      Mouse: Matter.Mouse,
+      Composite: Matter.Composite,
+      Bodies: Matter.Bodies
     }
   },
 
@@ -51,7 +60,7 @@ export default {
         showSeparations: false,
         showAxes: false,
         showPositions: false,
-        showAngleIndicator: false,
+        showAngleIndicator: true,
         showIds: false,
         showShadows: false,
         showVertexNumbers: false,
@@ -113,21 +122,39 @@ export default {
     // window.addEventListener('deviceorientation', this.listen())
     // window.addEventListener('devicemotion', this.listen())
     // window.addEventListener('MozOrientation', this.listen())
-    try {
-      // window.addEventListener('deviceorientation', this.listen)
-      // window.addEventListener('MozOrientation', this.listen)
-      window.addEventListener('devicemotion', this.listen, true)
-    } catch (e) {
-      this.accelerometer = e
+  },
+  created() {
+    // add gyro control
+    if (typeof window !== 'undefined') {
+      window.addEventListener('deviceorientation', this.updateGravity)
     }
   },
 
   method: {
-    listen(event) {
-      var x = event.accelerationIncludingGravity.x
-      var y = event.accelerationIncludingGravity.y
-      var z = event.accelerationIncludingGravity.z
-      this.accelerometer = [x, y, z]
+    updateGravity(event) {
+      var orientation = typeof window.orientation !== 'undefined' ? window.orientation : 0,
+        gravity = this.engine.gravity
+
+      if (orientation === 0) {
+        gravity.x = this.Common.clamp(event.gamma, -90, 90) / 90
+        gravity.y = this.Common.clamp(event.beta, -90, 90) / 90
+      } else if (orientation === 180) {
+        gravity.x = this.Common.clamp(event.gamma, -90, 90) / 90
+        gravity.y = this.Common.clamp(-event.beta, -90, 90) / 90
+      } else if (orientation === 90) {
+        gravity.x = this.Common.clamp(event.beta, -90, 90) / 90
+        gravity.y = this.Common.clamp(-event.gamma, -90, 90) / 90
+      } else if (orientation === -90) {
+        gravity.x = this.Common.clamp(-event.beta, -90, 90) / 90
+        gravity.y = this.Common.clamp(event.gamma, -90, 90) / 90
+      }
+    },
+    listen() {
+      this.accelerometer = window.screen.orientation.type
+      // var x = event.accelerationIncludingGravity.x
+      // var y = event.accelerationIncludingGravity.y
+      // var z = event.accelerationIncludingGravity.z
+      // this.accelerometer = [x, y, z]
       // Do something awesome.
     }
   }
