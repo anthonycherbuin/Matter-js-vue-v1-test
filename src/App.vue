@@ -1,7 +1,8 @@
 <template>
-  <div id="app">
-    <p>{{ this.accelerometer }}</p>
-  </div>
+  <section>
+    <div v-on:mousemove="mouseMove" id="app"></div>
+    GRAVITY: {{ gravity }}
+  </section>
 </template>
 
 <script>
@@ -17,6 +18,10 @@ export default {
   components: {},
   data() {
     return {
+      gravity: null,
+      movingShape1: null,
+      mouse: null,
+      cursor: null,
       accelerometer: 'i',
       Engine: Matter.Engine,
       Render: Matter.Render,
@@ -26,7 +31,8 @@ export default {
       MouseConstraint: Matter.MouseConstraint,
       Mouse: Matter.Mouse,
       Composite: Matter.Composite,
-      Bodies: Matter.Bodies
+      Bodies: Matter.Bodies,
+      Body: Matter.Body
     }
   },
 
@@ -34,8 +40,8 @@ export default {
     var Engine = Matter.Engine,
       Render = Matter.Render,
       Runner = Matter.Runner,
-      // MouseConstraint = Matter.MouseConstraint,
-      // Mouse = Matter.Mouse,
+      MouseConstraint = Matter.MouseConstraint,
+      Mouse = Matter.Mouse,
       World = Matter.World,
       Bodies = Matter.Bodies
 
@@ -48,10 +54,11 @@ export default {
       element: this.$el,
       engine: engine,
       options: {
+        background: '#f3ff00',
         width: window.innerWidth,
         height: window.innerHeight,
         pixelRatio: 'auto',
-        wireframes: true,
+        wireframes: false,
         showDebug: false,
         showBroadphase: false,
         showBounds: false,
@@ -60,7 +67,7 @@ export default {
         showSeparations: false,
         showAxes: false,
         showPositions: false,
-        showAngleIndicator: true,
+        showAngleIndicator: false,
         showIds: false,
         showShadows: false,
         showVertexNumbers: false,
@@ -76,12 +83,48 @@ export default {
     var runner = Runner.create()
     Runner.run(runner, engine)
 
-    const rectangle = Bodies.rectangle(50, 0, 50, 50, {
-      friction: 1,
-      restitution: 1
+    // add mouse control
+    this.mouse = Mouse.create(render.canvas)
+
+    this.mouseConstraint = MouseConstraint.create(engine, {
+      mouse: this.mouse,
+      constraint: {
+        stiffness: 0.2,
+        render: {
+          visible: false
+        }
+      }
     })
 
-    // const circle = Bodies.circle(100, -300, 50, { friction: 0, restitution: 1 })
+    // allow scroll on canva
+    this.mouseConstraint.mouse.element.removeEventListener('mousewheel', this.mouseConstraint.mouse.mousewheel)
+    this.mouseConstraint.mouse.element.removeEventListener('DOMMouseScroll', this.mouseConstraint.mouse.mousewheel)
+
+    World.add(world, this.mouseConstraint)
+
+    // keep the mouse in sync with rendering
+    render.mouse = this.mouse
+
+    const circle1 = Bodies.circle(window.innerWidth - 300, window.innerHeight - 300, 80, {
+      friction: 1,
+      restitution: 1.2,
+      isStatic: false,
+      render: { strokeStyle: 'black', lineWidth: 3, fillStyle: 'transparent' }
+    })
+
+    const circle2 = Bodies.circle(window.innerWidth - 200, window.innerHeight - 500, 80, {
+      friction: 0.2,
+      restitution: 1,
+      isStatic: false,
+      render: { strokeStyle: 'black', lineWidth: 3, fillStyle: 'black' }
+    })
+
+    this.movingShape1 = Bodies.rectangle(0, window.innerHeight - 50, window.innerWidth, window.innerHeight * 0.25, {
+      friction: 1,
+      restitution: 1,
+      isStatic: true,
+      render: { fillStyle: 'black' }
+    })
 
     const leftWall = Bodies.rectangle(-25, 300, 50, 800, {
       isStatic: true,
@@ -93,60 +136,49 @@ export default {
       friction: 0
     })
 
-    World.add(world, [rectangle])
+    World.add(world, [circle1, circle2, this.movingShape1])
     World.add(world, [Bodies.rectangle(300, window.innerHeight, window.innerWidth * 2, 20, { isStatic: true }), rightWall, leftWall])
 
-    // add mouse control
-    // var mouse = Mouse.create(render.canvas),
-    //   mouseConstraint = MouseConstraint.create(engine, {
-    //     mouse: mouse,
-    //     constraint: {
-    //       stiffness: 0.2,
-    //       render: {
-    //         visible: false
-    //       }
-    //     }
-    //   })
-
-    // World.add(world, mouseConstraint)
-
-    // keep the mouse in sync with rendering
-    // render.mouse = mouse
-
     // fit the render viewport to the scene
-    // Render.lookAt(render, {
-    //   min: { x: 0, y: 0 },
-    //   max: { x: 8000, y: 6000 }
-    // })
+    Render.lookAt(render, {
+      min: { x: 0, y: 0 },
+      max: { x: window.innerWidth, y: window.innerHeight }
+    })
 
-    // window.addEventListener('deviceorientation', this.listen())
-    // window.addEventListener('devicemotion', this.listen())
-    // window.addEventListener('MozOrientation', this.listen())
+    window.addEventListener('deviceorientation', this.updateGravity())
+    window.addEventListener('devicemotion', this.updateGravity())
+    window.addEventListener('MozOrientation', this.updateGravity())
   },
   created() {
     // add gyro control
     if (typeof window !== 'undefined') {
       window.addEventListener('deviceorientation', this.updateGravity)
+      console.log('add lsitener gravity')
+    } else {
+      console.log('nogravity: ')
     }
   },
-
-  method: {
+  methods: {
+    mouseMove: function (event) {
+      this.xCursor = event.clientX
+      this.Body.setPosition(this.movingShape1, { x: this.xCursor - window.innerWidth / 2, y: this.movingShape1.position.y })
+    },
     updateGravity(event) {
-      var orientation = typeof window.orientation !== 'undefined' ? window.orientation : 0,
-        gravity = this.engine.gravity
+      var orientation = typeof window.orientation !== 'undefined' ? window.orientation : 0
+      this.gravity = this.engine.gravity
 
       if (orientation === 0) {
-        gravity.x = this.Common.clamp(event.gamma, -90, 90) / 90
-        gravity.y = this.Common.clamp(event.beta, -90, 90) / 90
+        this.gravity.x = this.Common.clamp(event.gamma, -90, 90) / 90
+        this.gravity.y = this.Common.clamp(event.beta, -90, 90) / 90
       } else if (orientation === 180) {
-        gravity.x = this.Common.clamp(event.gamma, -90, 90) / 90
-        gravity.y = this.Common.clamp(-event.beta, -90, 90) / 90
+        this.gravity.x = this.Common.clamp(event.gamma, -90, 90) / 90
+        this.gravity.y = this.Common.clamp(-event.beta, -90, 90) / 90
       } else if (orientation === 90) {
-        gravity.x = this.Common.clamp(event.beta, -90, 90) / 90
-        gravity.y = this.Common.clamp(-event.gamma, -90, 90) / 90
+        this.gravity.x = this.Common.clamp(event.beta, -90, 90) / 90
+        this.gravity.y = this.Common.clamp(-event.gamma, -90, 90) / 90
       } else if (orientation === -90) {
-        gravity.x = this.Common.clamp(-event.beta, -90, 90) / 90
-        gravity.y = this.Common.clamp(event.gamma, -90, 90) / 90
+        this.gravity.x = this.Common.clamp(-event.beta, -90, 90) / 90
+        this.gravity.y = this.Common.clamp(event.gamma, -90, 90) / 90
       }
     },
     listen() {
@@ -171,7 +203,7 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   text-align: center;
-  color: #2c3e50;
+  background: #f3ff00;
   width: 100vw;
   height: 100vh;
 }
